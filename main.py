@@ -64,13 +64,10 @@ def prepare_data(positive_file, negative_file):
     
     return np.array(data), np.array(labels)
 
-def train_model(X, y):
-    """Train XGBoost model with hyperparameter tuning."""
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    
+def train_model_cv(X, y, n_splits=5):
+    """Train XGBoost model with cross-validation and hyperparameter tuning."""
     scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    X_scaled = scaler.fit_transform(X)
     
     param_grid = {
         'max_depth': [3, 5, 7],
@@ -80,33 +77,67 @@ def train_model(X, y):
     }
     
     model = XGBClassifier(use_label_encoder=False, eval_metric='logloss')
-    grid_search = GridSearchCV(model, param_grid, cv=3, n_jobs=-1, verbose=2)
-    grid_search.fit(X_train_scaled, y_train)
+    cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+    
+    grid_search = GridSearchCV(model, param_grid, cv=cv, n_jobs=-1, verbose=2, scoring='roc_auc')
+    grid_search.fit(X_scaled, y)
     
     best_model = grid_search.best_estimator_
-    y_pred = best_model.predict(X_test_scaled)
-    y_pred_proba = best_model.predict_proba(X_test_scaled)[:, 1]
     
     print("Best parameters:", grid_search.best_params_)
-    print("Accuracy:", accuracy_score(y_test, y_pred))
-    print("Precision:", precision_score(y_test, y_pred))
-    print("Recall:", recall_score(y_test, y_pred))
-    print("F1-score:", f1_score(y_test, y_pred))
-    print("ROC AUC:", roc_auc_score(y_test, y_pred_proba))
+    print("Cross-validation results:")
+    for i, score in enumerate(grid_search.cv_results_['split_test_score']):
+        print(f"Fold {i+1}: {score:.3f}")
+    print(f"Mean ROC AUC: {grid_search.best_score_:.3f}")
     
     return best_model, scaler
 
-def plot_feature_importance(model, feature_names):
-    """Plot feature importance."""
-    importance = model.feature_importances_
-    indices = np.argsort(importance)[::-1]
+def evaluate_model(model, X, y, scaler):
+    """Evaluate the model on the entire dataset."""
+    X_scaled = scaler.transform(X)
+    y_pred = model.predict(X_scaled)
+    y_pred_proba = model.predict_proba(X_scaled)[:, 1]
     
+    print("Final Model Performance:")
+    print("Accuracy:", accuracy_score(y, y_pred))
+    print("Precision:", precision_score(y, y_pred))
+    print("Recall:", recall_score(y, y_pred))
+    print("F1-score:", f1_score(y, y_pred))
+    print("ROC AUC:", roc_auc_score(y, y_pred_proba))
+
+def plot_feature_importance(model, feature_names):
+    """Plot feature importance using seaborn."""
+    importance = model.feature_importances_
+    feature_importance = pd.DataFrame({'feature': feature_names, 'importance': importance})
+    feature_importance = feature_importance.sort_values('importance', ascending=False).head(20)
+
     plt.figure(figsize=(12, 8))
-    plt.title("Feature Importances")
-    plt.bar(range(20), importance[indices][:20])
-    plt.xticks(range(20), [feature_names[i] for i in indices[:20]], rotation=90)
+    sns.barplot(x='importance', y='feature', data=feature_importance)
+    plt.title("Top 20 Feature Importances")
     plt.tight_layout()
     plt.savefig("feature_importance.png")
+    plt.close()
+
+def plot_confusion_matrix(y_true, y_pred):
+    """Plot confusion matrix using seaborn."""
+    cm = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+    plt.title('Confusion Matrix')
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.tight_layout()
+    plt.savefig("confusion_matrix.png")
+    plt.close()
+
+def plot_correlation_matrix(X, feature_names):
+    """Plot correlation matrix of features using seaborn."""
+    corr = pd.DataFrame(X, columns=feature_names).corr()
+    plt.figure(figsize=(20, 16))
+    sns.heatmap(corr, cmap='coolwarm', annot=False, square=True)
+    plt.title('Feature Correlation Matrix')
+    plt.tight_layout()
+    plt.savefig("correlation_matrix.png")
     plt.close()
 
 def main():
@@ -115,9 +146,15 @@ def main():
     
     X, y = prepare_data(positive_file, negative_file)
     feature_names = list(extract_features("A").keys()) * 2 + [f"CT_{i}" for i in range(686)]
-    model, scaler = train_model(X, y)
     
+    model, scaler = train_model_cv(X, y)
+    X_scaled = scaler.transform(X)
+    y_pred = model.predict(X_scaled)
+    
+    evaluate_model(model, X, y, scaler)
     plot_feature_importance(model, feature_names)
+    plot_confusion_matrix(y, y_pred)
+    plot_correlation_matrix(X, feature_names)
     
     # Save model and scaler
     import joblib
