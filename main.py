@@ -1,51 +1,12 @@
 import numpy as np
-import pandas as pd
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
-from xgboost import XGBClassifier
 from Bio import SeqIO
-from Bio.SeqUtils import ProtParam
-import matplotlib.pyplot as plt
-import seaborn as sns
-from collections import Counter
+import joblib
+from typing import Tuple, List
+from features import extract_features, compute_conjoint_triad
+from model import train_model_cv, evaluate_model
+from visualization import plot_feature_importance, plot_confusion_matrix, plot_correlation_matrix
 
-def extract_features(sequence):
-    """Extract features from a protein sequence."""
-    analyser = ProtParam.ProteinAnalysis(str(sequence))
-    amino_acid_percent = analyser.get_amino_acids_percent()
-    return {
-        'length': len(sequence),
-        'weight': analyser.molecular_weight(),
-        'aromaticity': analyser.aromaticity(),
-        'instability': analyser.instability_index(),
-        'isoelectric_point': analyser.isoelectric_point(),
-        'helix_fraction': analyser.secondary_structure_fraction()[0],
-        'turn_fraction': analyser.secondary_structure_fraction()[1],
-        'sheet_fraction': analyser.secondary_structure_fraction()[2],
-        'gravy': analyser.gravy(),
-        **{f'{aa}_percent': percent for aa, percent in amino_acid_percent.items()}
-    }
-
-def compute_conjoint_triad(sequence):
-    """Compute Conjoint Triad features."""
-    amino_acids = 'ACDEFGHIKLMNPQRSTVWY'
-    groups = {'A': 0, 'G': 0, 'V': 0,
-              'I': 1, 'L': 1, 'F': 1, 'P': 1,
-              'Y': 2, 'M': 2, 'T': 2, 'S': 2,
-              'H': 3, 'N': 3, 'Q': 3, 'W': 3,
-              'R': 4, 'K': 4,
-              'D': 5, 'E': 5,
-              'C': 6}
-    features = [0] * 343  # 7^3 possible triads
-
-    for i in range(len(sequence) - 2):
-        triad = (groups[sequence[i]], groups[sequence[i+1]], groups[sequence[i+2]])
-        features[triad[0]*49 + triad[1]*7 + triad[2]] += 1
-
-    return features
-
-def prepare_data(positive_file, negative_file):
+def prepare_data(positive_file: str, negative_file: str) -> Tuple[np.ndarray, np.ndarray]:
     """Prepare data from FASTA files of interacting and non-interacting protein pairs."""
     positive_pairs = list(SeqIO.parse(positive_file, "fasta"))
     negative_pairs = list(SeqIO.parse(negative_file, "fasta"))
@@ -64,88 +25,12 @@ def prepare_data(positive_file, negative_file):
     
     return np.array(data), np.array(labels)
 
-def train_model_cv(X, y, n_splits=5):
-    """Train XGBoost model with cross-validation and hyperparameter tuning."""
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    
-    param_grid = {
-        'max_depth': [3, 5, 7],
-        'learning_rate': [0.01, 0.1, 0.3],
-        'n_estimators': [100, 200, 300],
-        'min_child_weight': [1, 3, 5]
-    }
-    
-    model = XGBClassifier(use_label_encoder=False, eval_metric='logloss')
-    cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
-    
-    grid_search = GridSearchCV(model, param_grid, cv=cv, n_jobs=-1, verbose=2, scoring='roc_auc')
-    grid_search.fit(X_scaled, y)
-    
-    best_model = grid_search.best_estimator_
-    
-    print("Best parameters:", grid_search.best_params_)
-    print("Cross-validation results:")
-    for i, score in enumerate(grid_search.cv_results_['split_test_score']):
-        print(f"Fold {i+1}: {score:.3f}")
-    print(f"Mean ROC AUC: {grid_search.best_score_:.3f}")
-    
-    return best_model, scaler
-
-def evaluate_model(model, X, y, scaler):
-    """Evaluate the model on the entire dataset."""
-    X_scaled = scaler.transform(X)
-    y_pred = model.predict(X_scaled)
-    y_pred_proba = model.predict_proba(X_scaled)[:, 1]
-    
-    print("Final Model Performance:")
-    print("Accuracy:", accuracy_score(y, y_pred))
-    print("Precision:", precision_score(y, y_pred))
-    print("Recall:", recall_score(y, y_pred))
-    print("F1-score:", f1_score(y, y_pred))
-    print("ROC AUC:", roc_auc_score(y, y_pred_proba))
-
-def plot_feature_importance(model, feature_names):
-    """Plot feature importance using seaborn."""
-    importance = model.feature_importances_
-    feature_importance = pd.DataFrame({'feature': feature_names, 'importance': importance})
-    feature_importance = feature_importance.sort_values('importance', ascending=False).head(20)
-
-    plt.figure(figsize=(12, 8))
-    sns.barplot(x='importance', y='feature', data=feature_importance)
-    plt.title("Top 20 Feature Importances")
-    plt.tight_layout()
-    plt.savefig("feature_importance.png")
-    plt.close()
-
-def plot_confusion_matrix(y_true, y_pred):
-    """Plot confusion matrix using seaborn."""
-    cm = confusion_matrix(y_true, y_pred)
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-    plt.title('Confusion Matrix')
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label')
-    plt.tight_layout()
-    plt.savefig("confusion_matrix.png")
-    plt.close()
-
-def plot_correlation_matrix(X, feature_names):
-    """Plot correlation matrix of features using seaborn."""
-    corr = pd.DataFrame(X, columns=feature_names).corr()
-    plt.figure(figsize=(20, 16))
-    sns.heatmap(corr, cmap='coolwarm', annot=False, square=True)
-    plt.title('Feature Correlation Matrix')
-    plt.tight_layout()
-    plt.savefig("correlation_matrix.png")
-    plt.close()
-
 def main():
     positive_file = "positive_interactions.fasta"
     negative_file = "negative_interactions.fasta"
     
     X, y = prepare_data(positive_file, negative_file)
-    feature_names = list(extract_features("A").keys()) * 2 + [f"CT_{i}" for i in range(686)]
+    feature_names = list(extract_features(SeqIO.read(positive_file, "fasta")[0].seq).keys()) * 2 + [f"CT_{i}" for i in range(686)]
     
     model, scaler = train_model_cv(X, y)
     X_scaled = scaler.transform(X)
@@ -157,7 +42,6 @@ def main():
     plot_correlation_matrix(X, feature_names)
     
     # Save model and scaler
-    import joblib
     joblib.dump(model, "xgboost_model.joblib")
     joblib.dump(scaler, "scaler.joblib")
 
