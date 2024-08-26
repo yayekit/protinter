@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from xgboost import XGBClassifier
 from sklearn.metrics import confusion_matrix
+from typing import List
 
 def plot_feature_importance(model: XGBClassifier, feature_names: List[str]) -> None:
     """Plot feature importance using seaborn."""
