@@ -21,7 +21,7 @@ def extract_features(sequence: Seq) -> Dict[str, float]:
 
 def compute_conjoint_triad(sequence: str) -> List[int]:
     """Compute Conjoint Triad features."""
-    groups = {'A': 0, 'G': 0, 'V': 0,
+    groups = {'A': 0, 'G': 0, 'V': 0,  
               'I': 1, 'L': 1, 'F': 1, 'P': 1,
               'Y': 2, 'M': 2, 'T': 2, 'S': 2,
               'H': 3, 'N': 3, 'Q': 3, 'W': 3,
