@@ -34,7 +34,7 @@ def train_model_cv(X: np.ndarray, y: np.ndarray, n_splits: int = 5) -> Tuple[XGB
     print(f"Mean ROC AUC: {grid_search.best_score_:.3f}")
     
     return best_model, scaler
-
+                    
 def evaluate_model(model: XGBClassifier, X: np.ndarray, y: np.ndarray, scaler: StandardScaler) -> Dict[str, float]:
     """Evaluate the model on the entire dataset."""
     X_scaled = scaler.transform(X)

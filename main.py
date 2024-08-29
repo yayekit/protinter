@@ -3,7 +3,7 @@ from Bio import SeqIO
 import joblib
 from typing import Tuple, List
 from features import extract_features, compute_conjoint_triad
-from model import train_model_cv, evaluate_model
+from model import train_model_cv, evaluate_model, save_model
 from visualization import plot_feature_importance, plot_confusion_matrix, plot_correlation_matrix
 
 def prepare_data(positive_file: str, negative_file: str) -> Tuple[np.ndarray, np.ndarray]:
@@ -42,8 +42,7 @@ def main():
     plot_correlation_matrix(X, feature_names)
     
     # Save model and scaler
-    joblib.dump(model, "xgboost_model.joblib")
-    joblib.dump(scaler, "scaler.joblib")
+    save_model(model, scaler, "protein_interaction_model.joblib")
 
 if __name__ == "__main__":
     main()
