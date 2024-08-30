@@ -16,10 +16,10 @@ def train_model_cv(X: np.ndarray, y: np.ndarray, n_splits: int = 5) -> Tuple[XGB
         'learning_rate': [0.01, 0.1, 0.3],
         'n_estimators': [100, 200, 300],
         'min_child_weight': [1, 3, 5],
-        'early_stopping_rounds': [10, 20, 30]  # Add early stopping parameter
+        # Remove 'early_stopping_rounds' from param_grid
     }
     
-    model = XGBClassifier(use_label_encoder=False, eval_metric='logloss')
+    model = XGBClassifier(use_label_encoder=False, eval_metric='logloss', early_stopping_rounds=10)
     cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
     
     grid_search = GridSearchCV(model, param_grid, cv=cv, n_jobs=-1, verbose=2, scoring='roc_auc')

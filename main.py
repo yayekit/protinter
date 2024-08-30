@@ -30,7 +30,11 @@ def main():
     negative_file = "negative_interactions.fasta"
     
     X, y = prepare_data(positive_file, negative_file)
-    feature_names = list(extract_features(SeqIO.read(positive_file, "fasta")[0].seq).keys()) * 2 + [f"CT_{i}" for i in range(686)]
+    
+    # Dynamically determine the number of CT features
+    sample_seq = SeqIO.read(positive_file, "fasta")[0].seq
+    ct_features = compute_conjoint_triad(str(sample_seq))
+    feature_names = list(extract_features(sample_seq).keys()) * 2 + [f"CT_{i}" for i in range(len(ct_features))]
     
     model, scaler = train_model_cv(X, y)
     X_scaled = scaler.transform(X)
