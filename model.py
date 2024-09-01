@@ -4,7 +4,10 @@ from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from xgboost import XGBClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
 import joblib
+import optuna
 
 def train_model_cv(X: np.ndarray, y: np.ndarray, n_splits: int = 5) -> Tuple[XGBClassifier, StandardScaler]:
     """Train XGBoost model with cross-validation and hyperparameter tuning."""
@@ -69,3 +72,42 @@ def predict_new_data(model: XGBClassifier, scaler: StandardScaler, X_new: np.nda
     """Make predictions on new data using the trained model and scaler."""
     X_scaled = scaler.transform(X_new)
     return model.predict(X_scaled)
+
+def compare_models(X: np.ndarray, y: np.ndarray, models: Dict[str, Any]) -> Dict[str, float]:
+    """Compare multiple models using cross-validation."""
+    from sklearn.model_selection import cross_val_score
+    
+    results = {}
+    for name, model in models.items():
+        scores = cross_val_score(model, X, y, cv=5, scoring='roc_auc')
+        results[name] = scores.mean()
+    
+    return results
+
+def optimize_hyperparameters(X: np.ndarray, y: np.ndarray, n_trials: int = 100) -> Dict[str, Any]:
+    """Optimize hyperparameters using Optuna."""
+    def objective(trial):
+        params = {
+            'max_depth': trial.suggest_int('max_depth', 1, 9),
+            'learning_rate': trial.suggest_loguniform('learning_rate', 1e-3, 1.0),
+            'n_estimators': trial.suggest_int('n_estimators', 100, 1000),
+            'min_child_weight': trial.suggest_int('min_child_weight', 1, 10),
+            'subsample': trial.suggest_uniform('subsample', 0.6, 1.0),
+            'colsample_bytree': trial.suggest_uniform('colsample_bytree', 0.6, 1.0),
+        }
+        model = XGBClassifier(**params, use_label_encoder=False, eval_metric='logloss')
+        score = cross_val_score(model, X, y, cv=5, scoring='roc_auc').mean()
+        return score
+
+    study = optuna.create_study(direction='maximize')
+    study.optimize(objective, n_trials=n_trials)
+    
+    return study.best_params
+
+# Usage in main.py:
+models = {
+    'XGBoost': XGBClassifier(),
+    'Random Forest': RandomForestClassifier(),
+    'SVM': SVC(probability=True)
+}
+model_comparison = compare_models(X, y, models)
