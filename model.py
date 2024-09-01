@@ -10,31 +10,28 @@ import joblib
 import optuna
 
 def train_model_cv(X: np.ndarray, y: np.ndarray, n_splits: int = 5) -> Tuple[XGBClassifier, StandardScaler]:
-    """Train XGBoost model with cross-validation and hyperparameter tuning."""
+    """Train XGBoost model with cross-validation and hyperparameter tuning using Optuna."""
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
-    param_grid = {
-        'max_depth': [3, 5, 7],
-        'learning_rate': [0.01, 0.1, 0.3],
-        'n_estimators': [100, 200, 300],
-        'min_child_weight': [1, 3, 5],
-        # Remove 'early_stopping_rounds' from param_grid
-    }
+    # Use Optuna for hyperparameter optimization
+    best_params = optimize_hyperparameters(X_scaled, y, n_trials=100)
     
-    model = XGBClassifier(use_label_encoder=False, eval_metric='logloss', early_stopping_rounds=10)
+    # Create the best model with optimized parameters
+    best_model = XGBClassifier(**best_params, use_label_encoder=False, eval_metric='logloss')
+    
+    # Perform cross-validation with the best model
     cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+    cv_scores = cross_val_score(best_model, X_scaled, y, cv=cv, scoring='roc_auc')
     
-    grid_search = GridSearchCV(model, param_grid, cv=cv, n_jobs=-1, verbose=2, scoring='roc_auc')
-    grid_search.fit(X_scaled, y)
+    # Fit the best model on the entire dataset
+    best_model.fit(X_scaled, y)
     
-    best_model = grid_search.best_estimator_
-    
-    print("Best parameters:", grid_search.best_params_)
+    print(f"Best parameters: {best_params}")
     print("Cross-validation results:")
-    for i, score in enumerate(grid_search.cv_results_['split_test_score']):
-        print(f"Fold {i+1}: {score:.3f}")
-    print(f"Mean ROC AUC: {grid_search.best_score_:.3f}")
+    cv_results = [f"Fold {i+1}: {score:.3f}" for i, score in enumerate(cv_scores)]
+    print("\n".join(cv_results))
+    print(f"Mean ROC AUC: {cv_scores.mean():.3f}")
     
     return best_model, scaler
                     
@@ -53,8 +50,8 @@ def evaluate_model(model: XGBClassifier, X: np.ndarray, y: np.ndarray, scaler: S
     }
     
     print("Final Model Performance:")
-    for metric, value in metrics.items():
-        print(f"{metric}: {value:.3f}")
+    performance_results = [f"{metric}: {value:.3f}" for metric, value in metrics.items()]
+    print("\n".join(performance_results))
     
     return metrics
 
