@@ -4,7 +4,7 @@ from typing import Tuple, List
 from features import extract_features, compute_conjoint_triad
 
 def load_fasta(file_path: str) -> List[SeqIO.SeqRecord]:
-    """Load sequences from a FASTA file."""
+    """Load sequences from a FASTA fi   le."""
     return list(SeqIO.parse(file_path, "fasta"))
 
 def extract_pair_features(seq1: str, seq2: str) -> List[float]:
@@ -38,3 +38,10 @@ def load_and_preprocess_data(positive_file: str, negative_file: str) -> Tuple[np
     """Load and preprocess data from positive and negative interaction files."""
     X, y, feature_names = prepare_data(positive_file, negative_file)
     return X, y, feature_names
+
+def augment_data(X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """Augment the dataset using techniques like SMOTE for imbalanced classes."""
+    from imblearn.over_sampling import SMOTE
+    smote = SMOTE(random_state=42)
+    X_augmented, y_augmented = smote.fit_resample(X, y)
+    return X_augmented, y_augmented
