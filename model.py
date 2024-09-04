@@ -4,7 +4,7 @@ from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from xgboost import XGBClassifier
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC
 import joblib
 import optuna
@@ -103,8 +103,8 @@ def optimize_hyperparameters(X: np.ndarray, y: np.ndarray, n_trials: int = 100) 
 
 # Usage in main.py:
 models = {
-    'XGBoost': XGBClassifier(),
-    'Random Forest': RandomForestClassifier(),
-    'SVM': SVC(probability=True)
+    'XGBoost': XGBClassifier(random_state=42),
+    'Gradient Boosting': GradientBoostingClassifier(random_state=42),
+    'SVM': SVC(probability=True, random_state=42)
 }
 model_comparison = compare_models(X, y, models)
