@@ -1,6 +1,6 @@
 import numpy as np
-from typing import Tuple, Dict
-from sklearn.model_selection import StratifiedKFold, GridSearchCV
+from typing import Tuple, Dict, Any
+from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from xgboost import XGBClassifier

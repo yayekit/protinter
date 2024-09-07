@@ -10,6 +10,11 @@ setup(
         "scikit-learn",
         "xgboost",
         "joblib",
+        "pandas",
+        "matplotlib",
+        "seaborn",
+        "imbalanced-learn",
+        "optuna",
     ],
     entry_points={
         "console_scripts": [
