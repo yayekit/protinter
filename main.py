@@ -5,31 +5,49 @@ from interpretation import explain_model
 from ensemble import create_ensemble
 from visualization import plot_feature_importance, plot_confusion_matrix, plot_correlation_matrix
 
+#!/usr/bin/env python3
+import argparse
+import sys
+from Bio import SeqIO
+from Bio.Seq import Seq
+from features import extract_features
+from model import load_model, predict_new_data
+import numpy as np
+
 def main():
-    positive_file = "positive_interactions.fasta"
-    negative_file = "negative_interactions.fasta"
-    
-    X, y, feature_names = load_and_preprocess_data(positive_file, negative_file)
-    
-    # Data augmentation
-    X_augmented, y_augmented = augment_data(X, y)
+    parser = argparse.ArgumentParser(description="Predict protein interactions.")
+    parser.add_argument("sequence_file", help="Path to the protein sequence file (FASTA format)")
+    args = parser.parse_args()
 
-    # Feature selection
-    X_selected, selected_indices = select_features(X_augmented, y_augmented, k=50)
+    try:
+        # Load the sequence
+        with open(args.sequence_file, "r") as handle:
+            record = next(SeqIO.parse(handle, "fasta"))
+            sequence = record.seq
+    except FileNotFoundError:
+        print(f"Error: File '{args.sequence_file}' not found.")
+        sys.exit(1)
+    except StopIteration:
+        print(f"Error: No sequences found in '{args.sequence_file}'.")
+        sys.exit(1)
 
-    # Hyperparameter optimization
-    best_params = optimize_hyperparameters(X_selected, y_augmented)
-    
-    # Model training with optimized parameters
-    model, scaler = train_model_cv(X_selected, y_augmented, params=best_params)
+    # Extract features
+    features = extract_features(sequence)
+    X_new = np.array([list(features.values())])
 
-    # Model interpretation
-    explain_model(model, X_selected, [feature_names[i] for i in selected_indices])
+    # Load the pre-trained model
+    try:
+        model, scaler = load_model("protein_interaction_model.joblib")
+    except FileNotFoundError:
+        print("Error: Pre-trained model not found. Please ensure 'protein_interaction_model.joblib' is in the current directory.")
+        sys.exit(1)
 
-    # ... rest of the code ...
+    # Make prediction
+    prediction = predict_new_data(model, scaler, X_new)
 
-    # Save model and scaler
-    save_model(model, scaler, "protein_interaction_model.joblib")
+    # Print result
+    result = "likely to interact" if prediction[0] == 1 else "unlikely to interact"
+    print(f"The protein sequence in '{args.sequence_file}' is {result}.")
 
 if __name__ == "__main__":
     main()
