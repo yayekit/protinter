@@ -22,7 +22,5 @@ setup(
         ],
     },
     include_package_data=True,
-    package_data={
-        "": ["protein_interaction_model.joblib"],
-    },
+    # Remove the package_data parameter
 )
