@@ -3,7 +3,7 @@ from feature_selection import select_features
 from model import train_model_cv, evaluate_model, save_model, compare_models, optimize_hyperparameters
 from interpretation import explain_model
 from ensemble import create_ensemble
-from visualization import plot_feature_importance, plot_confusion_matrix, plot_correlation_matrix
+from visualization import plot_feature_importance, plot_confusion_matrix, plot_correlation_matrix, visualize_results
 
 #!/usr/bin/env python3
 import argparse
@@ -26,10 +26,15 @@ def generate_model(positive_file: str, negative_file: str):
     print("Training model...")
     model, scaler = train_model_cv(X_augmented, y_augmented)
     
+    print("Generating visualization plots...")
+    y_pred = predict_new_data(model, scaler, X_augmented)
+    visualize_results(model, X_augmented, y_augmented, y_pred, feature_names)
+    
     print("Saving model...")
     save_model(model, scaler, "protein_interaction_model.joblib")
     
     print("Model generation complete. Saved as 'protein_interaction_model.joblib'")
+    print("Visualization plots have been generated and saved.")
 
 def main():
     parser = argparse.ArgumentParser(description="Predict protein interactions or generate model.")
